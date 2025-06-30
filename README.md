@@ -11,7 +11,7 @@ pip install -r requirements.txt
 ## Instruction dataset generation
 
 ### Dataset content
-The instruction dataset comprises 1,022,742 image-instruction pairs spanning multiple vision-language tasks, including report generation, abnormality classification, anatomical and abnormality grounding, phrase grounding, and conversational interactions. Dataset sources and the corresponding number of image-instruction pairs are listed, with smaller datasets balanced by varying the frequency of instruction occurrences.
+The instruction dataset comprises 1,115,021 image-instruction pairs spanning multiple vision-language tasks, including report generation, abnormality classification, anatomical and abnormality grounding, phrase grounding, and conversational interactions. Dataset sources and the corresponding number of image-instruction pairs are listed, with smaller datasets balanced by varying the frequency of instruction occurrences.
 
 | Task                    | Dataset source    | Image-instruction pairs (#) | Evaluation (#) | DUA                                                                                                                                          |
 |-------------------------|-------------------|-----------------------------|----------------|----------------------------------------------------------------------------------------------------------------------------------------------|
@@ -191,7 +191,7 @@ git clone https://huggingface.co/ChantalPellegrini/RaDialog-interactive-radiolog
 ### Model evaluation on single instructions
 All instruction tasks (report generation, abnormality classification, visual grounding) are evaluated on the test sets of the dataloaders provided in the `data` repo. In order to evaluate a specific model (RadVLM or baseline model), execute this command (scaling to number of available GPUs): 
 ```
-accelerate launch --num_processes=4 radvlm.evaluation.evaluate_instructions --task [report_generation, abnormality_classification, region_grounding, abnormality_grounding]  --model_name [radialog, llavamed, chexagent, maira2, llavaov, $CKPT_PATH_RADVLM] 
+accelerate launch --num_processes=4 -m radvlm.evaluation.evaluate_instructions --task [report_generation, abnormality_classification, region_grounding, abnormality_grounding]  --model_name [radialog, llavamed, chexagent, maira2, llavaov, $CKPT_PATH_RADVLM] 
 ```
 The tasks that can be evaluated for each model is summarized in the following table:
 
