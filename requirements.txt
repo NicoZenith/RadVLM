@@ -20,5 +20,6 @@ torchmetrics==1.4.0.post0
 ensemble-boxes==1.0.9
 albumentations==2.0.0
 openai==1.61.1
-
+green==0.0.11
+sentence_transformers==4.1.0
 
