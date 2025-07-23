@@ -5,6 +5,8 @@ import random
 from torch.utils.data import DataLoader, DistributedSampler
 from accelerate import PartialState
 from accelerate.utils import gather_object
+
+import re
     
 from radvlm.data.utils import custom_collate_fn
 from radvlm.data.datasets import (
@@ -16,7 +18,7 @@ from radvlm.data.datasets import (
     MS_CXR
 )
 
-from radvlm.evaluation.models_loading_inference import load_model_and_processor, inference_radialog, inference_llavamed, inference_llavaov, inference_chexagent, inference_maira2_report, inference_maira2_grounding
+from radvlm.evaluation.models_loading_inference import load_model_and_processor, inference_radialog, inference_llavamed, inference_llavaov, inference_chexagent, inference_maira2_report, inference_maira2_grounding, inference_qwen2vl
 from radvlm.evaluation.utils import plot_images_with_Bbox
 from radvlm.evaluation.compute_metrics_tasks import evaluate_results
 
@@ -69,7 +71,7 @@ def load_dataset(task, data_dir):
         dataset = VinDr_CXR_Dataset(datasetpath=dataset_path, split="test", flag_img = False)
     elif task == "report_generation":
         datasetpath = os.path.join(data_dir, 'MIMIC-CXR-JPG')
-        filtered_reports = os.path.join(data_dir, 'MIMIC-CXR-JPG/filtered_reports_test')
+        filtered_reports = os.path.join(data_dir, 'MIMIC-CXR-JPG/filtered_reports')
         dataset = MIMIC_Dataset_MM(
             datasetpath=datasetpath,
             split="test",
@@ -97,7 +99,7 @@ def load_dataset(task, data_dir):
             )
         else:
             datasetpath_mimic = os.path.join(DATA_DIR, 'MIMIC-CXR-JPG')
-            datasetpath_mscxr = os.path.join(DATA_DIR, 'CHEST_IMA')
+            datasetpath_mscxr = os.path.join(DATA_DIR, 'MS-CXR')
 
             split = "test"
             sentencesBBoxpath = os.path.join(datasetpath_mscxr, 'sentences_and_BBox_mscxr')
@@ -131,9 +133,18 @@ def process_inference_for_single_instruction(tokenizer, model, processor, data_l
         image_path = datapoint['img_path'] 
 
         if model_name =='radialog':
-            prompt = "Write a radiology report for this X-Ray."
-            #prompt = "List all the findings in this report."
-            generated_text, chat_history = inference_radialog(tokenizer, model, image_path, prompt)
+            if task == 'report_generation':
+                prompt = "Write a radiology report for this X-Ray."
+            elif task == 'abnormality_classification':
+                questions_variations = [
+                    "List all the findings in this report.",
+                    "Enumerate the observations from the report.", 
+                    "What findings can be identified from this report?"
+                ]
+                prompt = random.choice(questions_variations)
+                
+            generated_text, _ = inference_radialog(tokenizer, model, image_path, prompt)
+            
 
         elif model_name == 'chexagent':
             if task == 'report_generation' or task == 'abnormality_classification':
@@ -175,12 +186,26 @@ def process_inference_for_single_instruction(tokenizer, model, processor, data_l
             elif task == 'abnormality_grounding' or task == 'phrase_grounding' or task == 'region_grounding':
                 generated_text = inference_maira2_grounding(model, processor, image_path, datapoint['label'])
         else:
-            # for llava-ov checkpoint
-            generated_text, _ = inference_llavaov(model, processor, image_path, prompt)
+            if 'qwen' in model_name.lower():
+                generated_text, _ = inference_qwen2vl(model, processor, image_path, prompt)
+            else:
+                generated_text, _ = inference_llavaov(model, processor, image_path, prompt)
 
         # Store results in dictionary 
         optional_keys = ["id", "idx", "img_path", "img", "labels", "label", "txt", "boxes"]
         ans = {}
+
+        if r1:
+
+            match_pattern = r'<answer>(.*?)</answer>'
+
+            m = re.search(match_pattern, generated_text, re.DOTALL)
+            if m:
+                generated_text = m.group(1).strip()
+            else:
+                # fallback if tags missing
+                generated_text = generated_text.strip()
+
         ans["output"] = generated_text
         ans["instr"] = prompt
         ans["answer"] = datapoint['instr']["answer"]
@@ -194,7 +219,13 @@ def process_inference_for_single_instruction(tokenizer, model, processor, data_l
 
 def save_results(metrics, model_name, task, num_batches, output=False):
     ensure_directory_exists(RESULTS_DIR)
-    model_name = os.path.basename(model_name)
+    # extract just the last path component
+    last_part = os.path.basename(model_name)
+    # if it's a checkpoint, grab the parent directory name
+    if re.match(r'^checkpoint-.*', last_part):
+        model_name = os.path.basename(os.path.dirname(model_name))
+    else:
+        model_name = last_part
     filename = f"{model_name}_{task}"
     if output:
         filename = filename + '_output'
