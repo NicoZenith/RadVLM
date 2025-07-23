@@ -194,7 +194,7 @@ All instruction tasks (report generation, abnormality classification, visual gro
 ```
 accelerate launch --num_processes=4 -m radvlm.evaluation.evaluate_instructions --task [report_generation, abnormality_classification, region_grounding, abnormality_grounding]  --model_name [radialog, llavamed, chexagent, maira2, llavaov, $CKPT_PATH_RADVLM] 
 ```
-** If you evaluate a reasoning model, add `--r1` in the command` to strip out reasoning trace **
+**If you evaluate a reasoning model, add `--r1` in the command` to strip out reasoning trace**
 
 The tasks that can be evaluated for each model is summarized in the following table:
 
