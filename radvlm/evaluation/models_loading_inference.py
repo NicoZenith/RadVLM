@@ -21,10 +21,10 @@ if radialog_path not in sys.path:
     sys.path.append(radialog_path)
 
 # radialog imports 
-from LLAVA_Biovil.llava.mm_utils import tokenizer_image_token, KeywordsStoppingCriteria, remap_to_uint8
-from LLAVA_Biovil.llava.model.builder import load_pretrained_model
-from LLAVA_Biovil.llava.conversation import SeparatorStyle, conv_vicuna_v1
-from LLAVA_Biovil.llava.constants import IMAGE_TOKEN_INDEX
+# from LLAVA_Biovil.llava.mm_utils import tokenizer_image_token, KeywordsStoppingCriteria, remap_to_uint8
+# from LLAVA_Biovil.llava.model.builder import load_pretrained_model
+# from LLAVA_Biovil.llava.conversation import SeparatorStyle, conv_vicuna_v1
+# from LLAVA_Biovil.llava.constants import IMAGE_TOKEN_INDEX
 
 
 
@@ -87,29 +87,33 @@ def load_model_and_processor(model_name, device_map='cpu'):
             'microsoft/maira-2', 
             trust_remote_code=True
             )
-    elif model_name=='qwen2vl':
-        model = transformers.Qwen2VLForConditionalGeneration.from_pretrained(
-            "Qwen/Qwen2-VL-7B-Instruct", torch_dtype=torch.float16, device_map=device_map, attn_implementation="flash_attention_2"
-            )
-        processor = transformers.AutoProcessor.from_pretrained("Qwen/Qwen2-VL-7B-Instruct")
-
 
     else:
-        # Load llava-ov checkpoint 
-        common_kwargs = {
-            "torch_dtype": torch.float16,
-            "low_cpu_mem_usage": True, 
-        }
+        if 'qwen' in model_name.lower():
+            model = transformers.Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                model_name, torch_dtype=torch.float16, device_map=device_map
+                )
+            
+            min_pixels = 256*28*28
+            max_pixels = 1280*28*28
+            processor = transformers.AutoProcessor.from_pretrained(model_name, min_pixels=min_pixels, max_pixels=max_pixels)
 
-        if model_name == 'llavaov':
-            model_name = 'llava-hf/llava-onevision-qwen2-7b-si-hf'
+        else:
+            # Load llava-ov checkpoint 
+            common_kwargs = {
+                "torch_dtype": torch.float16,
+                "low_cpu_mem_usage": True, 
+            }
 
-        model = transformers.LlavaOnevisionForConditionalGeneration.from_pretrained(
-            model_name,
-            device_map=device_map,
-            **common_kwargs
-        )
-        processor = transformers.AutoProcessor.from_pretrained(model_name)
+            if model_name == 'llavaov':
+                model_name = 'llava-hf/llava-onevision-qwen2-7b-si-hf'
+
+            model = transformers.LlavaOnevisionForConditionalGeneration.from_pretrained(
+                model_name,
+                device_map=device_map,
+                **common_kwargs
+            )
+            processor = transformers.AutoProcessor.from_pretrained(model_name)
 
     return tokenizer, model, processor
 
@@ -377,6 +381,139 @@ def inference_llavamed(model, processor, image_path, prompt, chat_history=None, 
 
 
 
+from qwen_vl_utils import process_vision_info
+import torch
+
+
+import re
+
+def inference_qwen2vl(model, processor, image_path, prompt, chat_history=None, max_new_tokens=1500):
+    """
+    Generate a response using the Qwen-2-VL model in either single-turn or multi-turn mode,
+    taking a local image_path and preserving full conversation history.
+
+    Args:
+        model: The Qwen-2-VL model.
+        processor: The Qwen-2-VL processor (apply_chat_template, tokenization, batch_decode).
+        image_path: Path on disk to your image (e.g. "/path/to/img.jpg").
+        prompt: The user prompt for this turn.
+        chat_history: A list of (user_msg, assistant_msg) tuples representing prior conversation.
+                      If None or empty, single-turn mode is used.
+        max_new_tokens: The maximum number of new tokens to generate.
+
+    Returns:
+        response (str): The assistant’s response for this turn.
+        chat_history (list): The updated chat_history including this turn’s (prompt, response).
+    """
+    # 1) Initialize history if needed
+    if chat_history is None:
+        chat_history = []
+
+    # 2) Build the file:// URI for the image
+    image_uri = f"file://{image_path}"
+
+    # 3) Construct the messages list
+    messages = []
+    for turn_idx, (user_txt, assistant_txt) in enumerate(chat_history):
+        # user turn
+        if turn_idx == 0:
+            # first historic turn included the image
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text",  "text": user_txt},
+                    {"type": "image", "image": image_uri},
+                ],
+            })
+        else:
+            messages.append({
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": user_txt},
+                ],
+            })
+        # assistant response
+        messages.append({
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": assistant_txt},
+            ],
+        })
+
+    # 4) Add the new user turn
+    if len(chat_history) == 0:
+        # first-ever turn: include image + prompt
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "image", "image": image_uri, "resized_height": 512, "resized_width":512},
+                {"type": "text",  "text": prompt},
+            ],
+        })
+    else:
+        # subsequent round: only text
+        messages.append({
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+            ],
+        })
+
+    # 5) Extract vision inputs
+    image_inputs, video_inputs = process_vision_info(messages)
+
+    # 6) Build the full text prompt
+    full_prompt = processor.apply_chat_template(
+        messages,
+        tokenize=False,
+        add_generation_prompt=True,
+    )
+
+    # 7) Prepare tensor inputs
+    inputs = processor(
+        text=[full_prompt],
+        images=image_inputs,
+        videos=video_inputs,
+        padding=True,
+        return_tensors="pt",
+    )
+
+    # 8) Move all tensors to device, then cast only vision tensors to float16
+    for k, v in inputs.items():
+        inputs[k] = v.to(model.device)
+    if "pixel_values" in inputs:
+        inputs["pixel_values"] = inputs["pixel_values"].half()
+    if "video_inputs" in inputs:
+        inputs["video_inputs"] = inputs["video_inputs"].half()
+    if "video_frames" in inputs:
+        inputs["video_frames"] = inputs["video_frames"].half()
+
+    # 9) Generate
+    with torch.inference_mode():
+        generated_ids = model.generate(
+            **inputs,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            use_cache=True,
+        )
+
+    # 10) Trim off the input tokens from each output
+    trimmed = [
+        out_ids[len(in_ids):]
+        for in_ids, out_ids in zip(inputs["input_ids"], generated_ids)
+    ]
+
+    # 11) Decode
+    output_texts = processor.batch_decode(
+        trimmed,
+        skip_special_tokens=True,
+        clean_up_tokenization_spaces=False,
+    )
+    response = output_texts[0].strip()
+
+    # 12) Update history and return
+    chat_history.append((prompt, response))
+    return response, chat_history
     
 
 def inference_llavaov(model, processor, image_path, prompt, chat_history=None, max_new_tokens=1500):
