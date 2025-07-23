@@ -190,9 +190,12 @@ git clone https://huggingface.co/ChantalPellegrini/RaDialog-interactive-radiolog
 
 ### Model evaluation on single instructions
 All instruction tasks (report generation, abnormality classification, visual grounding) are evaluated on the test sets of the dataloaders provided in the `data` repo. In order to evaluate a specific model (RadVLM or baseline model), execute this command (scaling to number of available GPUs): 
+
 ```
 accelerate launch --num_processes=4 -m radvlm.evaluation.evaluate_instructions --task [report_generation, abnormality_classification, region_grounding, abnormality_grounding]  --model_name [radialog, llavamed, chexagent, maira2, llavaov, $CKPT_PATH_RADVLM] 
 ```
+** If you evaluate a reasoning model, add `--r1` in the command` to strip out reasoning trace **
+
 The tasks that can be evaluated for each model is summarized in the following table:
 
 | Model          | Report | Classification | Grounding | Conversation |
