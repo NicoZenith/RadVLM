@@ -42,6 +42,7 @@ def parse_arguments():
     ], help='The task to perform')
     parser.add_argument('--model_name', type=str, required=True, help='The model name to evaluate')
     parser.add_argument('--num_batches', type=int, default=None, help='Number of batches to process, if none process all')
+    parser.add_argument('--r1', action='store_true', help='Enable R1 mode (default: False)')
     return parser.parse_args()
     
 
@@ -118,7 +119,7 @@ def load_dataset(task, data_dir):
     return dataset
 
 
-def process_inference_for_single_instruction(tokenizer, model, processor, data_loader, process_batch_num=None, model_name='llavaov', task='report_generation'):
+def process_inference_for_single_instruction(tokenizer, model, processor, data_loader, process_batch_num=None, model_name='llavaov', task='report_generation', r1=False):
     ret = []
     total_batches = len(data_loader)
     for batch_i, batch in enumerate(data_loader):
@@ -196,9 +197,7 @@ def process_inference_for_single_instruction(tokenizer, model, processor, data_l
         ans = {}
 
         if r1:
-
             match_pattern = r'<answer>(.*?)</answer>'
-
             m = re.search(match_pattern, generated_text, re.DOTALL)
             if m:
                 generated_text = m.group(1).strip()
@@ -289,7 +288,8 @@ if __name__ == "__main__":
         data_loader,
         process_batch_num=args.num_batches,
         model_name=args.model_name, 
-        task=args.task
+        task=args.task, 
+        r1=args.r1
     )
 
     # Gather results
