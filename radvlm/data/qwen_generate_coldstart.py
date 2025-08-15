@@ -44,7 +44,7 @@ CLIENT = OpenAI(
 )
 MAX_SIDE = 512
 JPEG_QUAL = 90
-TEMPLATE_PATH = "/capstor/scratch/cscs/ndeperr/code/RadVLM/radvlm/evaluation/prompt_coldstart.txt"
+TEMPLATE_PATH = "/capstor/scratch/cscs/ndeperr/code/RadVLM-r1/RadVLM/radvlm/data/prompt_coldstart.txt"
 template_text = pathlib.Path(TEMPLATE_PATH).read_text(encoding='utf-8')
 THINK_SUFFIX = (
     " First output the thinking process in <think> </think> tags and then "

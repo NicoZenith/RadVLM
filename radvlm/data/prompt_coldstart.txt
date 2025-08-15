@@ -10,7 +10,7 @@ For every case you will receive
 
 1. Examine the image and reason step-by-step about every visual clue and domain principle that leads to the answer.  
 2. Write that reasoning trace inside a block that starts with **<think>** and ends with **</think>**.  
-   - Make the trace richly detailed: **at least 600 words (≈800 tokens)**.  Longer is welcome if helpful.  
+   - Make the trace richly detailed. Longer is welcome if helpful.  
    - Feel free to organise your thoughts in whatever way suits you—narrative, bullet notes, free-flow self-dialogue, etc.  
    - You may explore alternative hypotheses, backtrack, express uncertainty, and link findings to pathophysiology.  
    - Refer to concrete image features or spatial relationships when relevant.  
@@ -18,16 +18,6 @@ For every case you will receive
 3. Immediately after the reasoning trace, output the final answer **verbatim** inside a block that starts with **<answer>** and ends with **</answer>**.  
 
 Outside those two blocks you must output nothing.
-
-Some optional prompts to inspire depth (use any, all, or none):  
-• global first impressions – what leaps out?  
-• systematic sweep through anatomic regions  
-• differential diagnoses weighed and rejected  
-• technical/artifact considerations  
-• correlation with pathophysiology or clinical context  
-• moments of self-questioning or correction  
-
----
 
 ### User
 <image> {IMAGE}
@@ -41,7 +31,7 @@ Gold Answer (copy verbatim in the <answer> block):
 
 ### Assistant
 <think>
-<!-- your expansive chain-of-thought (≥600 words) goes here -->
+<!-- your expansive chain-of-thought (≥300 words) goes here -->
 </think>
 <answer>
 {ANSWER_GT}
