@@ -187,6 +187,8 @@ def process_inference_for_single_instruction(tokenizer, model, processor, data_l
             elif task == 'abnormality_grounding' or task == 'phrase_grounding' or task == 'region_grounding':
                 generated_text = inference_maira2_grounding(model, processor, image_path, datapoint['label'])
         else:
+            if r1:
+                prompt = prompt + "First output the thinking process in <think> </think> tags and then output the final answer in <answer> </answer> tags."
             if 'qwen' in model_name.lower():
                 generated_text, _ = inference_qwen2vl(model, processor, image_path, prompt)
             else:
