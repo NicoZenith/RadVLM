@@ -94,8 +94,8 @@ def load_model_and_processor(model_name, device_map='cpu'):
                 model_name, torch_dtype=torch.float16, device_map=device_map
                 )
             
-            min_pixels = 256*28*28
-            max_pixels = 1280*28*28
+            min_pixels = 1024
+            max_pixels = 262144
             processor = transformers.AutoProcessor.from_pretrained(model_name, min_pixels=min_pixels, max_pixels=max_pixels)
 
         else:
@@ -446,7 +446,7 @@ def inference_qwen2vl(model, processor, image_path, prompt, chat_history=None, m
         messages.append({
             "role": "user",
             "content": [
-                {"type": "image", "image": image_uri, "resized_height": 512, "resized_width":512},
+                {"type": "image", "image": image_uri, },
                 {"type": "text",  "text": prompt},
             ],
         })
